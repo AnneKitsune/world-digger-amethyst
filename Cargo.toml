@@ -1,0 +1,7 @@
+[package]
+name = "world-digger"
+version = "0.1.0"
+authors = ["Joël Lupien (Jojolepro) <jojolepromain@gmail.com>"]
+
+[dependencies]
+amethyst = { git = "https://github.com/jojolepro/amethyst", branch = "cameracontrols" }
