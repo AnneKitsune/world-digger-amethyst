@@ -5,7 +5,7 @@ authors = ["Joël Lupien (Jojolepro) <jojolepromain@gmail.com>"]
 
 [dependencies]
 amethyst = { git = "https://github.com/amethyst/amethyst", branch = "develop" }
-amethyst-rhusics = { git = "https://github.com/amethyst/amethyst-rhusics" }
+amethyst-rhusics = { git = "https://github.com/amethyst/amethyst-rhusics", branch = "fix/docs" }
 rhusics-ecs = { version = "0.1", features = ["eders"] }
 rhusics-core = { version = "0.1", features = ["specs", "eders"] }
 specs = "0.10"

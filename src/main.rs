@@ -21,10 +21,10 @@ use amethyst::shrev::EventChannel;
 use amethyst_rhusics::{time_sync, DefaultBasicPhysicsBundle3};
 use collision::Aabb3;
 use collision::primitive::{Primitive3,Cuboid};
-use rhusics_core::{CollisionShape, RigidBody,Collider,ContactEvent};
+use rhusics_core::{CollisionShape, RigidBody,Collider,ContactEvent,Velocity};
 use rhusics_ecs::WithRigidBody;
 use rhusics_ecs::physics3d::{BodyPose3, CollisionMode, CollisionStrategy, Mass3};
-use amethyst::core::cgmath::{Deg, Array, Basis3,Basis2, One, Point3, Quaternion, Vector3};
+use amethyst::core::cgmath::{Deg, Array, Basis3,Basis2, One, Point3, Quaternion, Vector3,Matrix3,Zero};
 
 pub type Shape = CollisionShape<Primitive3<f32>, BodyPose3<f32>, Aabb3<f32>, ObjectType>;
 
@@ -70,7 +70,7 @@ impl State for ExampleState {
 
 
             let radius = 4;
-            let cube_size = 1.0;
+            let cube_size = 3.0;
 
             let mut comps: Vec<(Material, Transform)> = vec![];
 
@@ -100,28 +100,49 @@ impl State for ExampleState {
         };
 
         world.register::<ObjectType>();
-        world.write_resource::<EventChannel<ContactEvent<Entity, Point3<f32>>>>();
+        //world.write_resource::<EventChannel<ContactEvent<Entity, Point3<f32>>>>();
 
         while let Some(c) = comps.pop(){
             world
                 .create_entity()
                 .with(cube.clone())
                 .with(c.0)
-                .with(c.1)
                 .with(GlobalTransform::default())
-                .with_static_rigid_body(
+                .with_dynamic_rigid_body(
                     Shape::new_simple_with_type(
                         CollisionStrategy::FullResolution,
                         CollisionMode::Discrete,
                         Cuboid::new(1.0, 1.0,1.0).into(),
                         ObjectType::Box,
                     ),
-                    BodyPose3::new(Point3::new(0.0, 0.0,0.0), Quaternion::one()),
+                    BodyPose3::new(Point3::new(c.1.translation.x, c.1.translation.y,c.1.translation.z), Quaternion::one()),
+                    Velocity::<Vector3<f32>,Vector3<f32>>::new(Vector3::new(0.0,-10.0,0.0),Vector3::zero()),
                     RigidBody::default(),
-                    Mass3::infinite(),
+                    Mass3::new(1.0),
                 )
+                .with(c.1)
                 .build();
         }
+
+
+        let mut trans = Transform::default();
+        trans.translation = Vector3::new(0.0, -20.0, 0.0);
+        world
+            .create_entity()
+            .with(GlobalTransform::default())
+            .with_static_rigid_body(
+                Shape::new_simple_with_type(
+                    CollisionStrategy::FullResolution,
+                    CollisionMode::Discrete,
+                    Cuboid::new(50.0, 0.5,50.0).into(),
+                    ObjectType::Box,
+                ),
+                BodyPose3::new(Point3::new(trans.translation.x, trans.translation.y,trans.translation.z), Quaternion::one()),
+                RigidBody::default(),
+                Mass3::infinite(),
+            )
+            .with(trans)
+            .build();
 
         world.add_resource(AmbientColor(Rgba::from([1.0; 3])));
     }
