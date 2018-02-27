@@ -4,4 +4,11 @@ version = "0.1.0"
 authors = ["Joël Lupien (Jojolepro) <jojolepromain@gmail.com>"]
 
 [dependencies]
-amethyst = { git = "https://github.com/jojolepro/amethyst", branch = "cameracontrols" }
+amethyst = { git = "https://github.com/amethyst/amethyst", branch = "develop" }
+amethyst-rhusics = { git = "https://github.com/amethyst/amethyst-rhusics" }
+rhusics-ecs = { version = "0.1", features = ["eders"] }
+rhusics-core = { version = "0.1", features = ["specs", "eders"] }
+specs = "0.10"
+shrev = "0.8"
+collision = "0.14"
+rand = "0.3"

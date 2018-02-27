@@ -1,19 +1,55 @@
 extern crate amethyst;
+extern crate amethyst_rhusics;
+extern crate rhusics_core;
+extern crate rhusics_ecs;
+extern crate collision;
 
 use amethyst::{Application, Error, State, Trans};
 use amethyst::assets::{Loader,AssetStorage};
 use amethyst::config::Config;
 use amethyst::controls::{FlyControlTag,FlyControlBundle};
-use amethyst::core::cgmath::{Deg, Vector3};
 use amethyst::core::frame_limiter::FrameRateLimitStrategy;
 use amethyst::core::transform::{GlobalTransform, Transform, TransformBundle};
-use amethyst::ecs::World;
+use amethyst::ecs::{World,VecStorage,Component,Fetch,Entity};
 use amethyst::input::InputBundle;
 use amethyst::renderer::{AmbientColor, Camera, DisplayConfig, DrawShaded, ElementState, Event,
                          KeyboardInput, Material, MaterialDefaults, MeshHandle, ObjFormat,
                          Pipeline, PosNormTex, Projection, RenderBundle, Rgba, Stage,
                          VirtualKeyCode, WindowEvent,Texture};
-use amethyst::ecs::Fetch;
+use amethyst::shrev::EventChannel;
+
+use amethyst_rhusics::{time_sync, DefaultBasicPhysicsBundle3};
+use collision::Aabb3;
+use collision::primitive::{Primitive3,Cuboid};
+use rhusics_core::{CollisionShape, RigidBody,Collider,ContactEvent};
+use rhusics_ecs::WithRigidBody;
+use rhusics_ecs::physics3d::{BodyPose3, CollisionMode, CollisionStrategy, Mass3};
+use amethyst::core::cgmath::{Deg, Array, Basis3,Basis2, One, Point3, Quaternion, Vector3};
+
+pub type Shape = CollisionShape<Primitive3<f32>, BodyPose3<f32>, Aabb3<f32>, ObjectType>;
+
+#[repr(u8)]
+#[derive(Debug, Clone, PartialOrd, PartialEq)]
+pub enum ObjectType {
+    Box,
+}
+
+impl Default for ObjectType {
+    fn default() -> Self {
+        ObjectType::Box
+    }
+}
+
+impl Collider for ObjectType {
+    fn should_generate_contacts(&self, other: &ObjectType) -> bool {
+        self != other
+    }
+}
+
+impl Component for ObjectType {
+    type Storage = VecStorage<Self>;
+}
+
 
 struct ExampleState;
 
@@ -33,8 +69,8 @@ impl State for ExampleState {
             let tex_storage = world.read_resource();
 
 
-            let radius = 10;
-            let cube_size = 2.0;
+            let radius = 4;
+            let cube_size = 1.0;
 
             let mut comps: Vec<(Material, Transform)> = vec![];
 
@@ -63,6 +99,9 @@ impl State for ExampleState {
             (comps,cube)
         };
 
+        world.register::<ObjectType>();
+        world.write_resource::<EventChannel<ContactEvent<Entity, Point3<f32>>>>();
+
         while let Some(c) = comps.pop(){
             world
                 .create_entity()
@@ -70,6 +109,17 @@ impl State for ExampleState {
                 .with(c.0)
                 .with(c.1)
                 .with(GlobalTransform::default())
+                .with_static_rigid_body(
+                    Shape::new_simple_with_type(
+                        CollisionStrategy::FullResolution,
+                        CollisionMode::Discrete,
+                        Cuboid::new(1.0, 1.0,1.0).into(),
+                        ObjectType::Box,
+                    ),
+                    BodyPose3::new(Point3::new(0.0, 0.0,0.0), Quaternion::one()),
+                    RigidBody::default(),
+                    Mass3::infinite(),
+                )
                 .build();
         }
 
@@ -148,6 +198,7 @@ fn run() -> Result<(), Error> {
             InputBundle::<String, String>::new().with_bindings_from_file(&key_bindings_path),
         )?
         .with_bundle(RenderBundle::new(pipeline_builder, Some(display_config)))?
+        .with_bundle(DefaultBasicPhysicsBundle3::<f32,ObjectType>::new())?
         .build()?;
     game.run();
     Ok(())
