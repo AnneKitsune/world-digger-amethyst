@@ -10,7 +10,7 @@ use amethyst::config::Config;
 use amethyst::controls::{FlyControlTag,FlyControlBundle};
 use amethyst::core::frame_limiter::FrameRateLimitStrategy;
 use amethyst::core::transform::{GlobalTransform, Transform, TransformBundle};
-use amethyst::ecs::{World,VecStorage,Component,Fetch,Entity};
+use amethyst::ecs::{World,VecStorage,Component,Fetch,Entity,System,Join,ReadStorage};
 use amethyst::input::InputBundle;
 use amethyst::renderer::{AmbientColor, Camera, DisplayConfig, DrawShaded, ElementState, Event,
                          KeyboardInput, Material, MaterialDefaults, MeshHandle, ObjFormat,
@@ -19,12 +19,59 @@ use amethyst::renderer::{AmbientColor, Camera, DisplayConfig, DrawShaded, Elemen
 use amethyst::shrev::EventChannel;
 
 use amethyst_rhusics::{time_sync, DefaultBasicPhysicsBundle3};
-use collision::Aabb3;
+use collision::{Aabb3,Ray3};
+use collision::dbvt::query_ray_closest;
 use collision::primitive::{Primitive3,Cuboid};
 use rhusics_core::{CollisionShape, RigidBody,Collider,ContactEvent,Velocity};
 use rhusics_ecs::WithRigidBody;
-use rhusics_ecs::physics3d::{BodyPose3, CollisionMode, CollisionStrategy, Mass3};
-use amethyst::core::cgmath::{Deg, Array, Basis3,Basis2, One, Point3, Quaternion, Vector3,Matrix3,Zero};
+use rhusics_ecs::physics3d::{register_physics,BodyPose3, CollisionMode,
+                             CollisionStrategy, Mass3,DynamicBoundingVolumeTree3,SpatialSortingSystem3,ContactEvent3,
+                             SpatialCollisionSystem3,GJK3,CurrentFrameUpdateSystem3,NextFrameSetupSystem3,ContactResolutionSystem3};
+use amethyst::core::cgmath::{Deg, Array, Basis3,Basis2, One, Point3, Quaternion, Vector3,Matrix3,Zero,EuclideanSpace};
+
+
+
+/*
+TODO
+
+Raycast
+Click mine
+UI
+-Layouting
+-Macro for btn, auto layout by pos
+
+
+
+
+*/
+
+
+
+
+struct RayCastSystem;
+
+impl<'a> System<'a> for RayCastSystem {
+    type SystemData = (
+        Fetch<'a, DynamicBoundingVolumeTree3<f32>>,
+        ReadStorage<'a, Camera>,
+        ReadStorage<'a, Transform>,
+    );
+
+    fn run(&mut self, (tree,camera,transform): Self::SystemData) {
+        for (tr,_) in (&transform,&camera).join(){
+            //let ray = Ray3::new(Point3::new(-4., 10., 0.), Vector3::new(0., -1., 0.));
+            let forward = Quaternion::from(tr.rotation).conjugate() * Vector3::unit_z();
+            let ray = Ray3::new(Point3::from_vec(tr.translation), forward);
+            if let Some((v, p)) = query_ray_closest(&*tree, ray) {
+                println!("hit bounding volume of {:?} at point {:?}", v.value, p);
+            }
+        }
+    }
+}
+
+
+
+
 
 pub type Shape = CollisionShape<Primitive3<f32>, BodyPose3<f32>, Aabb3<f32>, ObjectType>;
 
@@ -54,7 +101,15 @@ impl Component for ObjectType {
 struct ExampleState;
 
 impl State for ExampleState {
-    fn on_start(&mut self, world: &mut World) {
+    fn on_start(&mut self, mut world: &mut World) {
+        register_physics::<f32, ObjectType>(&mut world);
+        //world.register_physics_3d
+
+
+
+
+
+
         initialise_camera(world);
 
         let (mut comps,cube) = {
@@ -99,11 +154,11 @@ impl State for ExampleState {
             (comps,cube)
         };
 
-        world.register::<ObjectType>();
+        //world.register::<ObjectType>();
         //world.write_resource::<EventChannel<ContactEvent<Entity, Point3<f32>>>>();
 
         while let Some(c) = comps.pop(){
-            world
+            /*world
                 .create_entity()
                 .with(cube.clone())
                 .with(c.0)
@@ -121,7 +176,7 @@ impl State for ExampleState {
                     Mass3::new(1.0),
                 )
                 .with(c.1)
-                .build();
+                .build();*/
         }
 
 
@@ -207,6 +262,12 @@ fn run() -> Result<(), Error> {
             .clear_target([1.0, 0.6, 0.8, 1.0], 1.0)
             .with_pass(DrawShaded::<PosNormTex>::new()),
     );
+
+    // PHYSIC-------------------------
+    let mut channel = EventChannel::<ContactEvent<Entity,Point3<f32>>>::new();
+    let reader_2 = channel
+        .register_reader();
+
     let mut game = Application::build(resources_directory, ExampleState)?
         .with_frame_limit(FrameRateLimitStrategy::Unlimited, 0)
         .with_bundle(FlyControlBundle::<String, String>::new(
@@ -219,7 +280,18 @@ fn run() -> Result<(), Error> {
             InputBundle::<String, String>::new().with_bindings_from_file(&key_bindings_path),
         )?
         .with_bundle(RenderBundle::new(pipeline_builder, Some(display_config)))?
-        .with_bundle(DefaultBasicPhysicsBundle3::<f32,ObjectType>::new())?
+        //.with_bundle(DefaultBasicPhysicsBundle3::<f32,ObjectType>::new())?
+
+        //PHYSICS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+        .with(SpatialSortingSystem3::<f32, BodyPose3<f32>, ObjectType>::new(),"1",&[])
+        .with(SpatialCollisionSystem3::<f32, BodyPose3<f32>, ObjectType>::new().with_narrow_phase(GJK3::new()),"2",&["1"])
+        .with(CurrentFrameUpdateSystem3::<f32>::new(),"3",&["2"])
+        .with(NextFrameSetupSystem3::<f32>::new(),"4",&["3"])
+        //.with(RayCastSystem,"raycast_test",&["3"])
+        .with(ContactResolutionSystem3::<f32>::new(reader_2),"5",&["4"])
+        .with_resource(EventChannel::<ContactEvent<Entity,Point3<f32>>>::new())
+        .with_resource(channel)
         .build()?;
     game.run();
     Ok(())
