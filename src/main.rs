@@ -5,7 +5,7 @@ extern crate rhusics_ecs;
 extern crate collision;
 
 use amethyst::{Application, Error, State, Trans};
-use amethyst::assets::{Loader,AssetStorage};
+use amethyst::assets::{Loader,AssetStorage,Handle};
 use amethyst::config::Config;
 use amethyst::controls::{FlyControlTag,FlyControlBundle};
 use amethyst::core::frame_limiter::FrameRateLimitStrategy;
@@ -156,7 +156,7 @@ impl Default for ObjectType {
 
 impl Collider for ObjectType {
     fn should_generate_contacts(&self, other: &ObjectType) -> bool {
-        self != other
+        true
     }
 }
 
@@ -184,7 +184,7 @@ impl State for ExampleState {
 
 
             let radius = 4;
-            let cube_size = 1.0;
+            let cube_size = 2.0;
 
             let mut comps: Vec<(Material, Transform)> = vec![];
 
@@ -212,6 +212,7 @@ impl State for ExampleState {
             }
             (comps,cube)
         };
+
         while let Some(c) = comps.pop(){
             world
                 .create_entity()
@@ -239,8 +240,9 @@ impl State for ExampleState {
 
         //Plane under the cubes
 
-        /*let mut trans = Transform::default();
+        let mut trans = Transform::default();
         trans.translation = Vector3::new(0.0, -20.0, 0.0);
+        trans.scale = Vector3::new(50.0,5.0,50.0);
         world
             .create_entity()
             .with(GlobalTransform::default())
@@ -248,15 +250,15 @@ impl State for ExampleState {
                 Shape::new_simple_with_type(
                     CollisionStrategy::FullResolution,
                     CollisionMode::Discrete,
-                    Cuboid::new(50.0, 0.5,50.0).into(),
+                    Cuboid::new(50.0, 5.0,50.0).into(),
                     ObjectType::Box,
                 ),
-                BodyPose3::new(Point3::new(trans.translation.x, trans.translation.y,trans.translation.z), Quaternion::one()),
+                BodyPose3::new(Point3::new(trans.translation.x, trans.translation.y,trans.translation.z), Quaternion::zero()),
                 RigidBody::default(),
                 Mass3::infinite(),
             )
             .with(trans)
-            .build();*/
+            .build();
 
 
         // INVENTORY
@@ -324,6 +326,11 @@ impl State for ExampleState {
             },
             _ => (),
         }
+        Trans::None
+    }
+
+    fn update(&mut self, world: &mut World) -> Trans {
+        time_sync(world);
         Trans::None
     }
 }
