@@ -11,7 +11,7 @@ use amethyst::controls::{FlyControlTag,FlyControlBundle};
 use amethyst::core::frame_limiter::FrameRateLimitStrategy;
 use amethyst::core::transform::{GlobalTransform, Transform, TransformBundle};
 use amethyst::core::{Time,Parent};
-use amethyst::ecs::{World,VecStorage,Component,Fetch,Entity,System,Join,ReadStorage,FetchMut,Entities};
+use amethyst::ecs::{World,VecStorage,Component,Fetch,Entity,System,Join,ReadStorage,FetchMut,Entities,WriteStorage};
 use amethyst::input::{InputBundle,InputHandler};
 use amethyst::renderer::{AmbientColor, Camera, DisplayConfig, DrawShaded, ElementState, Event,
                          KeyboardInput, Material, MaterialDefaults, MeshHandle, ObjFormat,
@@ -26,16 +26,17 @@ use amethyst_rhusics::{time_sync, DefaultBasicPhysicsBundle3,SpatialPhysicsBundl
 use collision::{Aabb3,Ray3};
 use collision::dbvt::query_ray_closest;
 use collision::primitive::{Primitive3,Cuboid};
-use rhusics_core::{CollisionShape, RigidBody,Collider,ContactEvent,Velocity};
+use rhusics_core::{CollisionShape, RigidBody,Collider,ContactEvent,Velocity,ForceAccumulator};
 use rhusics_ecs::WithRigidBody;
 use rhusics_ecs::physics3d::{register_physics,BodyPose3, CollisionMode,
                              CollisionStrategy, Mass3,DynamicBoundingVolumeTree3,SpatialSortingSystem3,ContactEvent3,
-                             SpatialCollisionSystem3,GJK3,CurrentFrameUpdateSystem3,NextFrameSetupSystem3,ContactResolutionSystem3};
+                             SpatialCollisionSystem3,GJK3,CurrentFrameUpdateSystem3,NextFrameSetupSystem3,ContactResolutionSystem3,Velocity3};
 use amethyst::core::cgmath::{Deg, Array, Basis3,Basis2, One, Point3, Quaternion, Vector3,Matrix3,Zero,EuclideanSpace,Rotation};
 
 mod player;
 use player::{Tool,Backpack,BlockDefinition,BlockDefinitions,BlockInstance,Inventory,UiUpdaterSystem,MineProgress};
-
+mod ui;
+use ui::{create_game_ui,load_tool_icon};
 
 /*
 TODO
@@ -77,9 +78,10 @@ impl<'a> System<'a> for MiningSystem {
         FetchMut<'a, Inventory>,
         FetchMut<'a, MineProgress>,
         Fetch<'a, Time>,
+        WriteStorage<'a, ForceAccumulator<Vector3<f32>, Vector3<f32>>>,
     );
 
-    fn run(&mut self, (entities,tree,camera,transform,block_definitions,input, mut inventory, mut progress, time): Self::SystemData) {
+    fn run(&mut self, (entities,tree,camera,transform,block_definitions,input, mut inventory, mut progress, time,mut force): Self::SystemData) {
         let btn_down = input.mouse_button_is_down(MouseButton::Left);
 
         if btn_down {
@@ -88,6 +90,13 @@ impl<'a> System<'a> for MiningSystem {
                 let ray = Ray3::new(Point3::from_vec(tr.translation), forward);
                 if let Some((v, p)) = query_ray_closest(&*tree, ray) {
                     println!("hit bounding volume of {:?} at point {:?}", v.value, p);
+
+
+                    if let Some(mut f) = force.get_mut(v.value){
+                        f.add_force(Vector3::new(1.0,-10.0,1.0));
+                        println!("ADDING FORCE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                    }
+
 
                     // TODO raycast lookat + dist check, are we mining same block that we were
                     if Some(v.value) != progress.block {
@@ -160,12 +169,9 @@ struct ExampleState;
 
 impl State for ExampleState {
     fn on_start(&mut self, mut world: &mut World) {
-        //register_physics::<f32, ObjectType>(&mut world);
-        //world.register_physics_3d
-
         initialise_camera(world);
 
-        let (mut comps,cube,font,red,blue,green) = {
+        let (mut comps,cube) = {
             let mat_defaults = world.read_resource::<MaterialDefaults>().clone();
 
             let loader = world.read_resource::<Loader>();
@@ -173,18 +179,6 @@ impl State for ExampleState {
                 let mesh_storage = world.read_resource();
                 loader.load("cube.obj", ObjFormat, (), (), &mesh_storage)
             };
-
-            let font = loader.load(
-                "fonts/Nunito-Black.ttf",
-                TtfFormat,
-                Default::default(),
-                (),
-                &world.read_resource::<AssetStorage<FontAsset>>(),
-            );
-
-            let red = loader.load_from_data([1.0,0.0,0.0,1.0].into(), (), &world.read_resource::<AssetStorage<Texture>>());
-            let blue = loader.load_from_data([0.0,0.0,1.0,1.0].into(), (), &world.read_resource::<AssetStorage<Texture>>());
-            let green = loader.load_from_data([0.0,1.0,0.0,1.0].into(), (), &world.read_resource::<AssetStorage<Texture>>());
 
             let tex_storage = world.read_resource();
 
@@ -216,12 +210,8 @@ impl State for ExampleState {
                     }
                 }
             }
-            (comps,cube,font,red,blue,green)
+            (comps,cube)
         };
-
-        //world.register::<ObjectType>();
-        //world.write_resource::<EventChannel<ContactEvent<Entity, Point3<f32>>>>();
-
         while let Some(c) = comps.pop(){
             world
                 .create_entity()
@@ -236,34 +226,20 @@ impl State for ExampleState {
                         ObjectType::Box,
                     ),
                     BodyPose3::new(Point3::new(c.1.translation.x, c.1.translation.y,c.1.translation.z), Quaternion::one()),
-                    Velocity::<Vector3<f32>,Vector3<f32>>::new(Vector3::new(0.0,-10.0,0.0),Vector3::zero()),
+                    Velocity3::from_linear(Vector3::new(0.0,-10.0,0.0)),
                     RigidBody::default(),
                     Mass3::new(1.0),
+                )
+                .with(
+                    ForceAccumulator::<Vector3<f32>,Vector3<f32>>::new()
                 )
                 .with(c.1)
                 .build();
         }
 
+        //Plane under the cubes
 
-        /*let background = world
-            .create_entity()
-            .with(UiTransform::new(
-                "background".to_string(),
-                0.0,
-                0.0,
-                0.0,
-                20.0,
-                20.0,
-                0,
-            ))
-            .with(UiImage {
-                texture: red.clone(),
-            })
-            .with(Stretched::new(Stretch::XY))
-            .with(Anchored::new(Anchor::Middle))
-            .build();*/
-
-        let mut trans = Transform::default();
+        /*let mut trans = Transform::default();
         trans.translation = Vector3::new(0.0, -20.0, 0.0);
         world
             .create_entity()
@@ -280,15 +256,13 @@ impl State for ExampleState {
                 Mass3::infinite(),
             )
             .with(trans)
-            .build();
-
-        world.add_resource(AmbientColor(Rgba::from([1.0; 3])));
+            .build();*/
 
 
         // INVENTORY
         let tool1 = Tool{
             name: String::from("Spoon"),
-            icon: red.clone(),
+            icon: load_tool_icon(&world,String::from("Spoon")),
             use_time: 1.0,
             mine_quantity: 1,
             cost: 0,
@@ -296,7 +270,7 @@ impl State for ExampleState {
 
         let backpack1 = Backpack{
             name: String::from("Hands"),
-            icon: blue.clone(),
+            icon: load_tool_icon(&world,String::from("Spoon")),
             capacity: 5,
             cost: 0,
         };
@@ -322,147 +296,12 @@ impl State for ExampleState {
         world.add_resource(inventory);
         world.add_resource(progress);
         world.add_resource(Time::default());
+        world.add_resource(AmbientColor(Rgba::from([1.0; 3])));
         world.register::<BlockInstance>();
 
         // UI
 
-        world
-            .create_entity()
-            .with(UiTransform::new(
-                "money".to_string(),
-                270.,
-                45.,
-                1.,
-                500.,
-                75.,
-                1,
-            ))
-            .with(UiText::new(
-                font.clone(),
-                "0$".to_string(),
-                [0.2, 0.2, 1.0, 1.0],
-                50.,
-            ))
-            .with(Anchored::new(Anchor::TopLeft))
-            .build();
-
-        world
-            .create_entity()
-            .with(UiTransform::new(
-                "tool".to_string(),
-                -80.,
-                45.,
-                1.,
-                500.,
-                75.,
-                1,
-            ))
-            .with(UiText::new(
-                font.clone(),
-                "".to_string(),
-                [0.2, 0.2, 1.0, 1.0],
-                50.,
-            ))
-            .with(Anchored::new(Anchor::TopRight))
-            .build();
-
-        world
-            .create_entity()
-            .with(UiTransform::new(
-                "backpack".to_string(),
-                -80.,
-                120.,
-                1.,
-                500.,
-                75.,
-                1,
-            ))
-            .with(UiText::new(
-                font.clone(),
-                "".to_string(),
-                [0.2, 0.2, 1.0, 1.0],
-                50.,
-            ))
-            .with(Anchored::new(Anchor::TopRight))
-            .build();
-
-        world
-            .create_entity()
-            .with(UiTransform::new(
-                "carry".to_string(),
-                -80.,
-                195.,
-                1.,
-                500.,
-                75.,
-                1,
-            ))
-            .with(UiText::new(
-                font.clone(),
-                "0 Kg".to_string(),
-                [0.2, 0.2, 1.0, 1.0],
-                50.,
-            ))
-            .with(Anchored::new(Anchor::TopRight))
-            .build();
-
-        world
-            .create_entity()
-            .with(UiTransform::new(
-                "mine progress".to_string(),
-                0.,
-                -50.,
-                1.,
-                500.,
-                32.,
-                1,
-            ))
-            .with(UiImage {
-                texture: red.clone(),
-            })
-            .with(Anchored::new(Anchor::BottomMiddle))
-            .build();
-
-
-        let sell_btn = world
-            .create_entity()
-            .with(UiTransform::new(
-                "sell button".to_string(),
-                80.,
-                -40.,
-                1.,
-                150.,
-                100.,
-                1,
-            ))
-            .with(UiImage {
-                texture: green.clone(),
-            })
-            .with(Anchored::new(Anchor::MiddleLeft))
-            .build();
-
-        world
-            .create_entity()
-            .with(UiTransform::new(
-                "sell text".to_string(),
-                0.,
-                0.,
-                -1.,
-                50.,
-                40.,
-                -1,
-            ))
-            .with(UiText::new(
-                font.clone(),
-                "Sell".to_string(),
-                [0.0, 0.0, 0.0, 1.0],
-                50.,
-            ))
-            .with(Anchored::new(Anchor::Middle))
-            .with(Parent{
-                entity: sell_btn,
-            })
-            .build();
+        ui::create_game_ui(&mut world);
 
     }
 
@@ -541,7 +380,6 @@ fn run() -> Result<(), Error> {
             Some(String::from("move_z")),
         ).with_speed(20.0).with_sensitivity(0.3,0.3))?
         .with_bundle(UiBundle::<String,String>::new())?
-        .with_bundle(TransformBundle::new().with_dep(&["fly_movement"]))?
         .with_bundle(
             InputBundle::<String, String>::new().with_bindings_from_file(&key_bindings_path),
         )?
@@ -560,6 +398,7 @@ fn run() -> Result<(), Error> {
         .with_resource(EventChannel::<ContactEvent<Entity,Point3<f32>>>::new())
         .with_resource(channel)*/
         .with(MiningSystem::new(),"mining",&[])
+        .with_bundle(TransformBundle::new().with_dep(&["fly_movement","sync_system"]))?
         .build()?;
     game.run();
     Ok(())
