@@ -3,6 +3,7 @@ extern crate amethyst_rhusics;
 extern crate rhusics_core;
 extern crate rhusics_ecs;
 extern crate collision;
+extern crate shred;
 
 use amethyst::{Application, Error, State, Trans};
 use amethyst::assets::{Loader,AssetStorage,Handle};
@@ -10,17 +11,19 @@ use amethyst::config::Config;
 use amethyst::controls::{FlyControlTag,FlyControlBundle};
 use amethyst::core::frame_limiter::FrameRateLimitStrategy;
 use amethyst::core::transform::{GlobalTransform, Transform, TransformBundle};
-use amethyst::core::{Time,Parent};
+use amethyst::core::{Time,Parent,ECSBundle};
 use amethyst::ecs::{World,VecStorage,Component,Fetch,Entity,System,Join,ReadStorage,FetchMut,Entities,WriteStorage};
 use amethyst::input::{InputBundle,InputHandler};
 use amethyst::renderer::{AmbientColor, Camera, DisplayConfig, DrawShaded, ElementState, Event,
                          KeyboardInput, Material, MaterialDefaults, MeshHandle, ObjFormat,
                          Pipeline, PosNormTex, Projection, RenderBundle, Rgba, Stage,
-                         VirtualKeyCode, WindowEvent,Texture,MouseButton};
+                         VirtualKeyCode, WindowEvent,Texture,MouseButton,ScreenDimensions,WindowMessages};
+use amethyst::renderer::mouse::{release_cursor,grab_cursor,set_mouse_cursor_none,set_mouse_cursor};
 use amethyst::shrev::EventChannel;
 use amethyst::ui::{Anchor, Anchored, DrawUi, FontAsset, MouseReactive, Stretch, Stretched,
                    TtfFormat, UiBundle, UiEvent, UiFocused, UiImage, UiText,
                    UiTransform,TextEditing};
+use amethyst::winit::MouseCursor;
 
 use amethyst_rhusics::{time_sync, DefaultBasicPhysicsBundle3,SpatialPhysicsBundle3};
 use collision::{Aabb3,Ray3};
@@ -32,6 +35,8 @@ use rhusics_ecs::physics3d::{register_physics,BodyPose3, CollisionMode,
                              CollisionStrategy, Mass3,DynamicBoundingVolumeTree3,SpatialSortingSystem3,ContactEvent3,
                              SpatialCollisionSystem3,GJK3,CurrentFrameUpdateSystem3,NextFrameSetupSystem3,ContactResolutionSystem3,Velocity3};
 use amethyst::core::cgmath::{Deg, Array, Basis3,Basis2, One, Point3, Quaternion, Vector3,Matrix3,Zero,EuclideanSpace,Rotation};
+
+use shred::{Dispatcher,DispatcherBuilder};
 
 mod player;
 use player::{Tool,Backpack,BlockDefinition,BlockDefinitions,BlockInstance,Inventory,UiUpdaterSystem,MineProgress};
@@ -201,10 +206,18 @@ struct BuyMenuState{
 impl State for BuyMenuState{
     fn on_start(&mut self, mut world: &mut World){
         self.local_entities = create_buy_ui(&mut world);
+        release_cursor(&mut world.write_resource());
+        set_mouse_cursor(&mut world.write_resource(),MouseCursor::Default);
     }
 
     fn on_stop(&mut self, mut world: &mut World){
         world.delete_entities(self.local_entities.as_slice());
+        let dim = world.read_resource::<ScreenDimensions>();
+        let mut msg = world.write_resource::<WindowMessages>();
+
+        // Make mouse hidden again
+        grab_cursor(&mut msg);
+        set_mouse_cursor_none(&mut msg);
     }
     fn handle_event(&mut self, _: &mut World, event: Event) -> Trans {
         if event_was_key_pressed(event,VirtualKeyCode::P){
@@ -215,10 +228,40 @@ impl State for BuyMenuState{
     }
 }
 
-struct ExampleState;
+struct GameState{
+    dispatcher: Option<Dispatcher<'static,'static>>,
+}
 
-impl State for ExampleState {
+impl GameState{
+    pub fn new() -> Self{
+        GameState{
+            dispatcher: None,
+        }
+    }
+}
+
+pub fn with_bundle<B>(mut disp_builder: DispatcherBuilder<'static,'static>,mut world: &mut World, bundle: B) -> DispatcherBuilder<'static,'static>
+    where
+        B: ECSBundle<'static, 'static>,
+{
+    bundle
+        .build(&mut world, disp_builder)
+        .expect("Failed to add bundle to dispatcher builder")
+}
+
+
+impl State for GameState {
     fn on_start(&mut self, mut world: &mut World) {
+        let mut dispatcher = DispatcherBuilder::new()
+            .add(MiningSystem::new(),"mining",&[]);
+        dispatcher = with_bundle(dispatcher, &mut world,FlyControlBundle::<String, String>::new(
+            Some(String::from("move_x")),
+            Some(String::from("move_y")),
+            Some(String::from("move_z")),
+        ).with_speed(20.0).with_sensitivity(0.3,0.3));
+        self.dispatcher = Some(dispatcher.build());
+
+
         initialise_camera(world);
 
         let (mut comps,cube) = {
@@ -389,6 +432,7 @@ impl State for ExampleState {
 
     fn update(&mut self, world: &mut World) -> Trans {
         time_sync(world);
+        self.dispatcher.as_mut().unwrap().dispatch(&mut world.res);
         Trans::None
     }
 }
@@ -437,13 +481,13 @@ fn run() -> Result<(), Error> {
     let reader_2 = channel
         .register_reader();*/
 
-    let mut game = Application::build(resources_directory, ExampleState)?
+    let mut game = Application::build(resources_directory, GameState::new())?
         .with_frame_limit(FrameRateLimitStrategy::Unlimited, 0)
-        .with_bundle(FlyControlBundle::<String, String>::new(
+        /*.with_bundle(FlyControlBundle::<String, String>::new(
             Some(String::from("move_x")),
             Some(String::from("move_y")),
             Some(String::from("move_z")),
-        ).with_speed(20.0).with_sensitivity(0.3,0.3))?
+        ).with_speed(20.0).with_sensitivity(0.3,0.3))?*/
         .with_bundle(UiBundle::<String,String>::new())?
         .with_bundle(
             InputBundle::<String, String>::new().with_bindings_from_file(&key_bindings_path),
@@ -451,8 +495,7 @@ fn run() -> Result<(), Error> {
         .with_bundle(RenderBundle::new(pipeline_builder, Some(display_config)))?
         .with_bundle(SpatialPhysicsBundle3::<Primitive3<f32>,Aabb3<f32>,ObjectType>::new())?
         .with(UiUpdaterSystem,"ui_updater",&[])
-        .with(MiningSystem::new(),"mining",&[])
-        .with_bundle(TransformBundle::new().with_dep(&["fly_movement","sync_system"]))?
+        .with_bundle(TransformBundle::new().with_dep(&["sync_system"]))?
         .build()?;
     game.run();
     Ok(())

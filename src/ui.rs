@@ -226,8 +226,8 @@ pub fn create_buy_ui(mut world: &mut World)->Vec<Entity>{
             "toolbg".to_string(),
             270.,
             0.,
-            -1.,
-            500.,
+            -11.,
+            800.,
             0.,
             1,
         ))
@@ -238,6 +238,73 @@ pub fn create_buy_ui(mut world: &mut World)->Vec<Entity>{
         .with(Stretched::new(Stretch::Y).with_margin(0.0,20.0))
         .with(Parent{
             entity: bg.clone(),
+        })
+        .build();
+
+    let btn1_back = world
+        .create_entity()
+        .with(UiTransform::new(
+            "btn1_back".to_string(),
+            0.,
+            60.,
+            -12.,
+            0.,
+            80.,
+            1,
+        ))
+        .with(UiImage {
+            texture: ui.red.clone(),
+        })
+        .with(Anchored::new(Anchor::TopMiddle))
+        .with(Stretched::new(Stretch::X))
+        .with(Parent{
+            entity: tool_bg,
+        })
+        .build();
+
+    let btn1_txt = world
+        .create_entity()
+        .with(UiTransform::new(
+            "btn1_txt".to_string(),
+            350.,
+            0.,
+            -13.,
+            400.,
+            60.,
+            1,
+        ))
+        .with(UiText::new(
+            ui.font.clone(),
+            "Spoon".to_string(),
+            [0.2, 0.2, 1.0, 1.0],
+            50.,
+        ))
+        .with(Anchored::new(Anchor::MiddleLeft))
+        .with(Parent{
+            entity: btn1_back,
+        })
+        .build();
+
+    let btn1_price = world
+        .create_entity()
+        .with(UiTransform::new(
+            "btn1_price".to_string(),
+            0.,
+            0.,
+            -13.,
+            250.,
+            60.,
+            1,
+        ))
+        .with(UiText::new(
+            ui.font.clone(),
+            "0$".to_string(),
+            [0.2, 0.2, 1.0, 1.0],
+            50.,
+        ))
+        .with(Anchored::new(Anchor::MiddleRight))
+        .with(Parent{
+            entity: btn1_back,
         })
         .build();
 
@@ -264,10 +331,11 @@ pub fn create_buy_ui(mut world: &mut World)->Vec<Entity>{
         })
         .build());
 
-    println!("tool_bg: {:?}",tool_bg);
-
     out.push(bg);
     out.push(tool_bg);
+    out.push(btn1_back);
+    out.push(btn1_txt);
+    out.push(btn1_price);
 
     out
 }

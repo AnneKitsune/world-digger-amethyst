@@ -10,5 +10,6 @@ rhusics-ecs = { version = "0.1", features = ["eders"] }
 rhusics-core = { version = "0.1", features = ["specs", "eders"] }
 specs = "0.10"
 shrev = "0.8"
+shred = "0.5"
 collision = "0.14"
 rand = "0.3"
