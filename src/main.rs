@@ -36,7 +36,7 @@ use amethyst::core::cgmath::{Deg, Array, Basis3,Basis2, One, Point3, Quaternion,
 mod player;
 use player::{Tool,Backpack,BlockDefinition,BlockDefinitions,BlockInstance,Inventory,UiUpdaterSystem,MineProgress};
 mod ui;
-use ui::{create_game_ui,load_tool_icon};
+use ui::{create_game_ui,load_tool_icon,UiShit,load_ui_shit,create_buy_ui};
 
 /*
 TODO
@@ -92,10 +92,10 @@ impl<'a> System<'a> for MiningSystem {
                     println!("hit bounding volume of {:?} at point {:?}", v.value, p);
 
 
-                    if let Some(mut f) = force.get_mut(v.value){
+                    /*if let Some(mut f) = force.get_mut(v.value){
                         f.add_force(Vector3::new(1.0,-10.0,1.0));
                         println!("ADDING FORCE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-                    }
+                    }*/
 
 
                     // TODO raycast lookat + dist check, are we mining same block that we were
@@ -137,6 +137,12 @@ impl<'a> System<'a> for MiningSystem {
 }
 
 
+/*
+fn query_ray(tree: & DynamicBoundingVolumeTree3<f32>, ray: Ray3<f32>) -> Vec<(TreeValueWrapped<Entity, Aabb3<f32>>, Point3<f32>)> {
+    let mut visitor = ContinuousVisitor::new(&ray);
+    tree.query(&mut visitor)
+}
+*/
 
 
 
@@ -165,6 +171,50 @@ impl Component for ObjectType {
 }
 
 
+fn event_was_key_pressed(event: Event,key: VirtualKeyCode)->bool{
+    match event {
+        Event::WindowEvent { event, .. } => match event {
+            WindowEvent::KeyboardInput {
+                input:
+                KeyboardInput {
+                    virtual_keycode,
+                    state: ElementState::Pressed,
+                    ..
+                },
+                ..
+            } => match virtual_keycode {
+                Some(key2) if key == key2 => return true,
+                _ => (),
+            },
+            _ => (),
+        },
+        _ => (),
+    }
+    false
+}
+
+
+struct BuyMenuState{
+    local_entities: Vec<Entity>,
+}
+
+impl State for BuyMenuState{
+    fn on_start(&mut self, mut world: &mut World){
+        self.local_entities = create_buy_ui(&mut world);
+    }
+
+    fn on_stop(&mut self, mut world: &mut World){
+        world.delete_entities(self.local_entities.as_slice());
+    }
+    fn handle_event(&mut self, _: &mut World, event: Event) -> Trans {
+        if event_was_key_pressed(event,VirtualKeyCode::P){
+            println!("Pop buy menu");
+            return Trans::Pop;
+        }
+        Trans::None
+    }
+}
+
 struct ExampleState;
 
 impl State for ExampleState {
@@ -184,7 +234,7 @@ impl State for ExampleState {
 
 
             let radius = 4;
-            let cube_size = 2.0;
+            let cube_size = 1.0;
 
             let mut comps: Vec<(Material, Transform)> = vec![];
 
@@ -227,7 +277,7 @@ impl State for ExampleState {
                         ObjectType::Box,
                     ),
                     BodyPose3::new(Point3::new(c.1.translation.x, c.1.translation.y,c.1.translation.z), Quaternion::one()),
-                    Velocity3::from_linear(Vector3::new(0.0,-10.0,0.0)),
+                    Velocity3::from_linear(Vector3::new(0.0,0.0,0.0)),
                     RigidBody::default(),
                     Mass3::new(1.0),
                 )
@@ -253,7 +303,7 @@ impl State for ExampleState {
                     Cuboid::new(50.0, 5.0,50.0).into(),
                     ObjectType::Box,
                 ),
-                BodyPose3::new(Point3::new(trans.translation.x, trans.translation.y,trans.translation.z), Quaternion::zero()),
+                BodyPose3::new(Point3::new(trans.translation.x, trans.translation.y,trans.translation.z), Quaternion::one()),
                 RigidBody::default(),
                 Mass3::infinite(),
             )
@@ -308,7 +358,7 @@ impl State for ExampleState {
     }
 
     fn handle_event(&mut self, _: &mut World, event: Event) -> Trans {
-        match event {
+        /*match event {
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::KeyboardInput {
                     input:
@@ -325,7 +375,15 @@ impl State for ExampleState {
                 _ => (),
             },
             _ => (),
+        }*/
+
+        if event_was_key_pressed(event,VirtualKeyCode::X){
+            println!("Push buy menu");
+            return Trans::Push(Box::new(BuyMenuState{
+                local_entities: Vec::<Entity>::new(),
+            }));
         }
+
         Trans::None
     }
 
@@ -391,19 +449,8 @@ fn run() -> Result<(), Error> {
             InputBundle::<String, String>::new().with_bindings_from_file(&key_bindings_path),
         )?
         .with_bundle(RenderBundle::new(pipeline_builder, Some(display_config)))?
-        //.with_bundle(DefaultBasicPhysicsBundle3::<ObjectType>::new())?
         .with_bundle(SpatialPhysicsBundle3::<Primitive3<f32>,Aabb3<f32>,ObjectType>::new())?
         .with(UiUpdaterSystem,"ui_updater",&[])
-
-        //PHYSICS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-        /*.with(SpatialSortingSystem3::<f32, BodyPose3<f32>, ObjectType>::new(),"1",&[])
-        .with(SpatialCollisionSystem3::<f32, BodyPose3<f32>, ObjectType>::new().with_narrow_phase(GJK3::new()),"2",&["1"])
-        .with(CurrentFrameUpdateSystem3::<f32>::new(),"3",&["2"])
-        .with(NextFrameSetupSystem3::<f32>::new(),"4",&["3"])
-        .with(ContactResolutionSystem3::<f32>::new(reader_2),"5",&["4"])
-        .with_resource(EventChannel::<ContactEvent<Entity,Point3<f32>>>::new())
-        .with_resource(channel)*/
         .with(MiningSystem::new(),"mining",&[])
         .with_bundle(TransformBundle::new().with_dep(&["fly_movement","sync_system"]))?
         .build()?;
