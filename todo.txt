@@ -1,0 +1,20 @@
+Make Compile
+================================================================================
+-Remove rhusics-ecs
+-Update code to rust edition="2018"
+-Update amethyst to track master
+
+Feature Parity
+================================================================================
+-Add nphysics-ecs
+
+New Features
+================================================================================
+-Integrate movement system from amethyst-extra
+-Add physics to world blocks
+-Create list of block types and durabilities/hardness to break
+-Create list of ressource types
+-Create list of ressource type drop chance per block
+-Create list of ressource value
+-Create list of tools
+-Implement mesh optimizer algorithm for voxel based worlds

@@ -25,15 +25,15 @@ use amethyst::ui::{Anchor, Anchored, DrawUi, FontAsset, MouseReactive, Stretch, 
                    UiTransform,TextEditing};
 use amethyst::winit::MouseCursor;
 
-use amethyst_rhusics::{time_sync, DefaultBasicPhysicsBundle3,SpatialPhysicsBundle3};
+//use amethyst_rhusics::{time_sync, DefaultBasicPhysicsBundle3,SpatialPhysicsBundle3};
 use collision::{Aabb3,Ray3};
 use collision::dbvt::query_ray_closest;
 use collision::primitive::{Primitive3,Cuboid};
-use rhusics_core::{CollisionShape, RigidBody,Collider,ContactEvent,Velocity,ForceAccumulator};
+/*use rhusics_core::{CollisionShape, RigidBody,Collider,ContactEvent,Velocity,ForceAccumulator};
 use rhusics_ecs::WithRigidBody;
 use rhusics_ecs::physics3d::{register_physics,BodyPose3, CollisionMode,
                              CollisionStrategy, Mass3,DynamicBoundingVolumeTree3,SpatialSortingSystem3,ContactEvent3,
-                             SpatialCollisionSystem3,GJK3,CurrentFrameUpdateSystem3,NextFrameSetupSystem3,ContactResolutionSystem3,Velocity3};
+                             SpatialCollisionSystem3,GJK3,CurrentFrameUpdateSystem3,NextFrameSetupSystem3,ContactResolutionSystem3,Velocity3};*/
 use amethyst::core::cgmath::{Deg, Array, Basis3,Basis2, One, Point3, Quaternion, Vector3,Matrix3,Zero,EuclideanSpace,Rotation};
 
 use shred::{Dispatcher,DispatcherBuilder};
