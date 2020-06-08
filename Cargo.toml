@@ -5,9 +5,6 @@ authors = ["Joël Lupien (Jojolepro) <jojolepromain@gmail.com>"]
 
 [dependencies]
 amethyst = { git = "https://github.com/jojolepro/amethyst", branch = "uilayout" }
-#amethyst-rhusics = { git = "https://github.com/jojolepro/amethyst-rhusics" }
-#rhusics-ecs = { version = "0.1", features = ["eders"] }
-#rhusics-core = { version = "0.1", features = ["specs", "eders"] }
 specs = "0.16.1"
 shrev = "1.1.1"
 shred = "0.10.2"
