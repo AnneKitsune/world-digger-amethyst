@@ -1,0 +1,12 @@
+[package]
+name = "world-digger"
+version = "0.1.0"
+authors = ["Joël Lupien (Jojolepro) <jojolepromain@gmail.com>", "Alve Larsson <zurra.alve@gmail.com>"]
+
+[dependencies]
+amethyst = { git = "https://github.com/jojolepro/amethyst", branch = "uilayout" }
+specs = "0.16.1"
+shrev = "1.1.1"
+shred = "0.10.2"
+collision = "0.20.1"
+rand = "0.7.3"

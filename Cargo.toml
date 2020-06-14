@@ -1,12 +1,16 @@
 [package]
-name = "world-digger"
+name = "pdig"
 version = "0.1.0"
-authors = ["Joël Lupien (Jojolepro) <jojolepromain@gmail.com>", "Alve Larsson <zurra.alve@gmail.com>"]
+authors = ["Alve Larsson <larsalvelarsson@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-amethyst = { git = "https://github.com/jojolepro/amethyst", branch = "uilayout" }
-specs = "0.16.1"
-shrev = "1.1.1"
-shred = "0.10.2"
-collision = "0.20.1"
-rand = "0.7.3"
+amethyst = { git = "https://github.com/amethyst/amethyst.git", features=["no-slow-safety-checks"]}
+
+[features]
+default = ["vulkan"]
+empty = ["amethyst/empty"]
+metal = ["amethyst/metal"]
+vulkan = ["amethyst/vulkan"]
