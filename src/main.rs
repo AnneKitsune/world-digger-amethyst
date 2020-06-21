@@ -15,6 +15,9 @@ use amethyst::{
     Error,
 };
 
+mod worldgen;
+use worldgen::bundle;
+
 mod game;
 use game::{
     MyPrefabData,
@@ -53,7 +56,8 @@ fn main() -> Result<(), Error> {
                         .with_clear([0.34, 0.36, 0.52, 1.0]),
                 )
                 .with_plugin(RenderShaded3D::default()),
-        )?;
+        )?
+        .with_bundle(worldgen::bundle::WorldGenBundle::new())?;
 
     let mut game = Application::build(assets_dir, ExampleState)?.build(game_data)?;
     game.run();
